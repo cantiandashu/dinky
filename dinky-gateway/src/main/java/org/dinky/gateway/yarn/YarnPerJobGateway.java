@@ -19,6 +19,7 @@
 
 package org.dinky.gateway.yarn;
 
+import org.apache.flink.yarn.YarnClusterDescriptor;
 import org.dinky.assertion.Asserts;
 import org.dinky.constant.CustomerConfigureOptions;
 import org.dinky.data.enums.GatewayType;
@@ -30,7 +31,6 @@ import org.apache.flink.client.deployment.ClusterSpecification;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.yarn.YarnClusterDescriptor;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 import java.util.Arrays;

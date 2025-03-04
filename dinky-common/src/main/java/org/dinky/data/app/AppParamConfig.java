@@ -32,7 +32,7 @@ public class AppParamConfig {
     private String url;
     private String username;
     private String password;
-
+    private String driverClassName;
     @Override
     public String toString() {
         return "\nAppParamConfig{"

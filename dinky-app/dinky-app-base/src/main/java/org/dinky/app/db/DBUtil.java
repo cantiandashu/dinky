@@ -44,7 +44,7 @@ public class DBUtil {
     private static Db db;
 
     public static void init(AppParamConfig config) {
-        db = Db.use(new SimpleDataSource(config.getUrl(), config.getUsername(), config.getPassword()));
+        db = Db.use(new SimpleDataSource(config.getUrl(), config.getUsername(), config.getPassword(),config.getDriverClassName()));
     }
 
     public static AppTask getTask(int taskId) throws SQLException {

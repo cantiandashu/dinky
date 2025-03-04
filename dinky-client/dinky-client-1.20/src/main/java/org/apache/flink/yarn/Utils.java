@@ -1,29 +1,22 @@
 /*
- *
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.flink.yarn;
-
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.yarn.YarnConfigKeys.ENV_FLINK_CLASSPATH;
-import static org.apache.flink.yarn.YarnConfigKeys.LOCAL_RESOURCE_DESCRIPTOR_SEPARATOR;
-import static org.apache.flink.yarn.configuration.YarnConfigOptions.YARN_CONTAINER_START_COMMAND_TEMPLATE;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.ConfigConstants;
@@ -39,6 +32,7 @@ import org.apache.flink.util.StringUtils;
 import org.apache.flink.util.function.FunctionWithException;
 import org.apache.flink.yarn.configuration.YarnConfigOptions;
 import org.apache.flink.yarn.configuration.YarnResourceManagerDriverConfiguration;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -57,10 +51,12 @@ import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.api.records.URL;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,38 +70,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Stream;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.yarn.YarnConfigKeys.ENV_FLINK_CLASSPATH;
+import static org.apache.flink.yarn.YarnConfigKeys.LOCAL_RESOURCE_DESCRIPTOR_SEPARATOR;
+import static org.apache.flink.yarn.configuration.YarnConfigOptions.YARN_CONTAINER_START_COMMAND_TEMPLATE;
 
-import cn.hutool.core.util.StrUtil;
-
-/**
- * Utility class that provides helper methods to work with Apache Hadoop YARN.
- */
+/** Utility class that provides helper methods to work with Apache Hadoop YARN. */
 public final class Utils {
 
     private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
-    /**
-     * KRB5 file name populated in YARN container for secure IT run.
-     */
+    /** KRB5 file name populated in YARN container for secure IT run. */
     public static final String KRB5_FILE_NAME = "krb5.conf";
 
-    /**
-     * Yarn site xml file name populated in YARN container for secure IT run.
-     */
+    /** Yarn site xml file name populated in YARN container for secure IT run. */
     public static final String YARN_SITE_FILE_NAME = "yarn-site.xml";
 
-    /**
-     * Constant representing a wildcard access control list.
-     */
+    /** Constant representing a wildcard access control list. */
     private static final String WILDCARD_ACL = "*";
 
-    /**
-     * The prefixes that Flink adds to the YARN config.
-     */
+    /** The prefixes that Flink adds to the YARN config. */
     private static final String[] FLINK_CONFIG_PREFIXES = {"flink.yarn."};
 
     @VisibleForTesting
@@ -113,21 +99,26 @@ public final class Utils {
             "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler";
 
     @VisibleForTesting
-    static final String YARN_RM_SLS_FAIR_SCHEDULER_CLAZZ = "org.apache.hadoop.yarn.sls.scheduler.SLSFairScheduler";
+    static final String YARN_RM_SLS_FAIR_SCHEDULER_CLAZZ =
+            "org.apache.hadoop.yarn.sls.scheduler.SLSFairScheduler";
 
     @VisibleForTesting
-    static final String YARN_RM_INCREMENT_ALLOCATION_MB_KEY = "yarn.resource-types.memory-mb.increment-allocation";
+    static final String YARN_RM_INCREMENT_ALLOCATION_MB_KEY =
+            "yarn.resource-types.memory-mb.increment-allocation";
 
     @VisibleForTesting
-    static final String YARN_RM_INCREMENT_ALLOCATION_MB_LEGACY_KEY = "yarn.scheduler.increment-allocation-mb";
+    static final String YARN_RM_INCREMENT_ALLOCATION_MB_LEGACY_KEY =
+            "yarn.scheduler.increment-allocation-mb";
 
     private static final int DEFAULT_YARN_RM_INCREMENT_ALLOCATION_MB = 1024;
 
     @VisibleForTesting
-    static final String YARN_RM_INCREMENT_ALLOCATION_VCORES_KEY = "yarn.resource-types.vcores.increment-allocation";
+    static final String YARN_RM_INCREMENT_ALLOCATION_VCORES_KEY =
+            "yarn.resource-types.vcores.increment-allocation";
 
     @VisibleForTesting
-    static final String YARN_RM_INCREMENT_ALLOCATION_VCORES_LEGACY_KEY = "yarn.scheduler.increment-allocation-vcores";
+    static final String YARN_RM_INCREMENT_ALLOCATION_VCORES_LEGACY_KEY =
+            "yarn.scheduler.increment-allocation-vcores";
 
     @VisibleForTesting
     static final String IGNORE_UNRECOGNIZED_VM_OPTIONS = "-XX:+IgnoreUnrecognizedVMOptions";
@@ -135,13 +126,12 @@ public final class Utils {
     private static final int DEFAULT_YARN_RM_INCREMENT_ALLOCATION_VCORES = 1;
 
     public static void setupYarnClassPath(Configuration conf, Map<String, String> appMasterEnv) {
-        addToEnvironment(appMasterEnv, Environment.CLASSPATH.name(), appMasterEnv.get(ENV_FLINK_CLASSPATH));
-        String[] applicationClassPathEntries = conf.getStrings(
-                YarnConfiguration.YARN_APPLICATION_CLASSPATH,
-                Stream.of(YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)
-                        .map(x -> StrUtil.removeAll(x, "%"))
-                        .map(x -> "$".equals(StrUtil.subPre(x, 1)) ? x : "$" + x)
-                        .toArray(String[]::new));
+        addToEnvironment(
+                appMasterEnv, Environment.CLASSPATH.name(), appMasterEnv.get(ENV_FLINK_CLASSPATH));
+        String[] applicationClassPathEntries =
+                conf.getStrings(
+                        YarnConfiguration.YARN_APPLICATION_CLASSPATH,
+                        YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH);
         for (String c : applicationClassPathEntries) {
             addToEnvironment(appMasterEnv, Environment.CLASSPATH.name(), c.trim());
         }
@@ -155,25 +145,32 @@ public final class Utils {
      */
     public static void deleteApplicationFiles(final String applicationFilesDir) {
         if (!StringUtils.isNullOrWhitespaceOnly(applicationFilesDir)) {
-            final org.apache.flink.core.fs.Path path = new org.apache.flink.core.fs.Path(applicationFilesDir);
+            final org.apache.flink.core.fs.Path path =
+                    new org.apache.flink.core.fs.Path(applicationFilesDir);
             try {
                 final org.apache.flink.core.fs.FileSystem fileSystem = path.getFileSystem();
                 if (!fileSystem.delete(path, true)) {
-                    LOG.error("Deleting yarn application files under {} was unsuccessful.", applicationFilesDir);
+                    LOG.error(
+                            "Deleting yarn application files under {} was unsuccessful.",
+                            applicationFilesDir);
                 }
             } catch (final IOException e) {
-                LOG.error("Could not properly delete yarn application files directory {}.", applicationFilesDir, e);
+                LOG.error(
+                        "Could not properly delete yarn application files directory {}.",
+                        applicationFilesDir,
+                        e);
             }
         } else {
-            LOG.debug("No yarn application files directory set. Therefore, cannot clean up the data.");
+            LOG.debug(
+                    "No yarn application files directory set. Therefore, cannot clean up the data.");
         }
     }
 
     /**
      * Creates a YARN resource for the remote object at the given location.
      *
-     * @param remoteRsrcPath           remote location of the resource
-     * @param resourceSize             size of the resource
+     * @param remoteRsrcPath remote location of the resource
+     * @param resourceSize size of the resource
      * @param resourceModificationTime last modification time of the resource
      * @return YARN resource
      */
@@ -184,7 +181,8 @@ public final class Utils {
             LocalResourceVisibility resourceVisibility,
             LocalResourceType resourceType) {
         LocalResource localResource = Records.newRecord(LocalResource.class);
-        localResource.setResource(URL.fromURI(remoteRsrcPath.toUri()));
+//        localResource.setResource(URL.fromURI(remoteRsrcPath.toUri()));
+        localResource.setResource(ConverterUtils.getYarnUrlFromURI(remoteRsrcPath.toUri()));
         localResource.setSize(resourceSize);
         localResource.setTimestamp(resourceModificationTime);
         localResource.setType(resourceType);
@@ -195,7 +193,7 @@ public final class Utils {
     /**
      * Creates a YARN resource for the remote object at the given location.
      *
-     * @param fs             remote filesystem
+     * @param fs remote filesystem
      * @param remoteRsrcPath resource path to be registered
      * @return YARN resource
      */
@@ -214,12 +212,13 @@ public final class Utils {
      * Copied method from org.apache.hadoop.yarn.util.Apps. It was broken by YARN-1824 (2.4.0) and
      * fixed for 2.4.1 by https://issues.apache.org/jira/browse/YARN-1931
      */
-    public static void addToEnvironment(Map<String, String> environment, String variable, String value) {
+    public static void addToEnvironment(
+            Map<String, String> environment, String variable, String value) {
         String val = environment.get(variable);
         if (val == null) {
             val = value;
         } else {
-            val = val + ":" + value;
+            val = val + File.pathSeparator + value;
         }
         environment.put(StringInterner.weakIntern(variable), StringInterner.weakIntern(val));
     }
@@ -255,9 +254,7 @@ public final class Utils {
         return keytab;
     }
 
-    /**
-     * Private constructor to prevent instantiation.
-     */
+    /** Private constructor to prevent instantiation. */
     private Utils() {
         throw new RuntimeException();
     }
@@ -271,18 +268,18 @@ public final class Utils {
      * launch context. The launch context then ensures that those resources will be copied into the
      * containers transient working directory.
      *
-     * @param flinkConfig                  The Flink configuration object.
-     * @param yarnConfig                   The YARN configuration object.
-     * @param configuration                The YarnResourceManagerDriver configurations.
-     * @param tmParams                     The TaskExecutor container memory parameters.
+     * @param flinkConfig The Flink configuration object.
+     * @param yarnConfig The YARN configuration object.
+     * @param configuration The YarnResourceManagerDriver configurations.
+     * @param tmParams The TaskExecutor container memory parameters.
      * @param taskManagerDynamicProperties The dynamic configurations to be updated for the
-     *                                     TaskExecutors based on client uploaded Flink config.
-     * @param workingDirectory             The current application master container's working directory.
-     * @param taskManagerMainClass         The class with the main method.
-     * @param log                          The logger.
+     *     TaskExecutors based on client uploaded Flink config.
+     * @param workingDirectory The current application master container's working directory.
+     * @param taskManagerMainClass The class with the main method.
+     * @param log The logger.
      * @return The launch context for the TaskManager processes.
      * @throws Exception Thrown if the launch context could not be created, for example if the
-     *                   resources could not be copied.
+     *     resources could not be copied.
      */
     static ContainerLaunchContext createTaskExecutorContext(
             org.apache.flink.configuration.Configuration flinkConfig,
@@ -297,13 +294,17 @@ public final class Utils {
 
         // get and validate all relevant variables
 
-        String remoteFlinkJarPath = checkNotNull(
-                configuration.getFlinkDistJar(), "Environment variable %s not set", YarnConfigKeys.FLINK_DIST_JAR);
+        String remoteFlinkJarPath =
+                checkNotNull(
+                        configuration.getFlinkDistJar(),
+                        "Environment variable %s not set",
+                        YarnConfigKeys.FLINK_DIST_JAR);
 
-        String shipListString = checkNotNull(
-                configuration.getClientShipFiles(),
-                "Environment variable %s not set",
-                YarnConfigKeys.ENV_CLIENT_SHIP_FILES);
+        String shipListString =
+                checkNotNull(
+                        configuration.getClientShipFiles(),
+                        "Environment variable %s not set",
+                        YarnConfigKeys.ENV_CLIENT_SHIP_FILES);
 
         final String remoteKeytabPath = configuration.getRemoteKeytabPath();
         final String localKeytabPath = configuration.getLocalKeytabPath();
@@ -319,15 +320,17 @@ public final class Utils {
             log.debug("TM:remote krb5 path obtained {}", remoteKrb5Path);
         }
 
-        String classPathString = checkNotNull(
-                configuration.getFlinkClasspath(),
-                "Environment variable %s not set",
-                YarnConfigKeys.ENV_FLINK_CLASSPATH);
+        String classPathString =
+                checkNotNull(
+                        configuration.getFlinkClasspath(),
+                        "Environment variable %s not set",
+                        YarnConfigKeys.ENV_FLINK_CLASSPATH);
 
         // register keytab
         LocalResource keytabResource = null;
         if (remoteKeytabPath != null) {
-            log.info("TM:Adding keytab {} to the container local resource bucket", remoteKeytabPath);
+            log.info(
+                    "TM:Adding keytab {} to the container local resource bucket", remoteKeytabPath);
             Path keytabPath = new Path(remoteKeytabPath);
             FileSystem fs = keytabPath.getFileSystem(yarnConfig);
             keytabResource = registerLocalResource(fs, keytabPath, LocalResourceType.FILE);
@@ -336,7 +339,9 @@ public final class Utils {
         // To support Yarn Secure Integration Test Scenario
         LocalResource yarnConfResource = null;
         if (remoteYarnConfPath != null) {
-            log.info("TM:Adding remoteYarnConfPath {} to the container local resource bucket", remoteYarnConfPath);
+            log.info(
+                    "TM:Adding remoteYarnConfPath {} to the container local resource bucket",
+                    remoteYarnConfPath);
             Path yarnConfPath = new Path(remoteYarnConfPath);
             FileSystem fs = yarnConfPath.getFileSystem(yarnConfig);
             yarnConfResource = registerLocalResource(fs, yarnConfPath, LocalResourceType.FILE);
@@ -346,7 +351,9 @@ public final class Utils {
         LocalResource krb5ConfResource = null;
         boolean hasKrb5 = false;
         if (remoteKrb5Path != null) {
-            log.info("Adding remoteKrb5Path {} to the container local resource bucket", remoteKrb5Path);
+            log.info(
+                    "Adding remoteKrb5Path {} to the container local resource bucket",
+                    remoteKrb5Path);
             Path krb5ConfPath = new Path(remoteKrb5Path);
             FileSystem fs = krb5ConfPath.getFileSystem(yarnConfig);
             krb5ConfResource = registerLocalResource(fs, krb5ConfPath, LocalResourceType.FILE);
@@ -359,7 +366,8 @@ public final class Utils {
         final YarnLocalResourceDescriptor flinkDistLocalResourceDesc =
                 YarnLocalResourceDescriptor.fromString(remoteFlinkJarPath);
         taskManagerLocalResources.put(
-                flinkDistLocalResourceDesc.getResourceKey(), flinkDistLocalResourceDesc.toLocalResource());
+                flinkDistLocalResourceDesc.getResourceKey(),
+                flinkDistLocalResourceDesc.toLocalResource());
 
         // To support Yarn Secure Integration Test Scenario
         if (yarnConfResource != null) {
@@ -374,8 +382,11 @@ public final class Utils {
 
         // prepare additional files to be shipped
         decodeYarnLocalResourceDescriptorListFromString(shipListString)
-                .forEach(resourceDesc ->
-                        taskManagerLocalResources.put(resourceDesc.getResourceKey(), resourceDesc.toLocalResource()));
+                .forEach(
+                        resourceDesc ->
+                                taskManagerLocalResources.put(
+                                        resourceDesc.getResourceKey(),
+                                        resourceDesc.toLocalResource()));
 
         // now that all resources are prepared, we can create the launch context
 
@@ -384,16 +395,17 @@ public final class Utils {
         boolean hasLogback = new File(workingDirectory, "logback.xml").exists();
         boolean hasLog4j = new File(workingDirectory, "log4j.properties").exists();
 
-        String launchCommand = getTaskManagerShellCommand(
-                flinkConfig,
-                tmParams,
-                ".",
-                ApplicationConstants.LOG_DIR_EXPANSION_VAR,
-                hasLogback,
-                hasLog4j,
-                hasKrb5,
-                taskManagerMainClass,
-                taskManagerDynamicProperties);
+        String launchCommand =
+                getTaskManagerShellCommand(
+                        flinkConfig,
+                        tmParams,
+                        ".",
+                        ApplicationConstants.LOG_DIR_EXPANSION_VAR,
+                        hasLogback,
+                        hasLog4j,
+                        hasKrb5,
+                        taskManagerMainClass,
+                        taskManagerDynamicProperties);
 
         if (log.isDebugEnabled()) {
             log.debug("Starting TaskManagers with command: " + launchCommand);
@@ -440,8 +452,10 @@ public final class Utils {
             log.debug("Adding security tokens to TaskExecutor's container launch context.");
 
             try (DataOutputBuffer dob = new DataOutputBuffer()) {
-                Credentials cred = Credentials.readTokenStorageFile(
-                        new File(fileLocation), HadoopUtils.getHadoopConfiguration(flinkConfig));
+                Credentials cred =
+                        Credentials.readTokenStorageFile(
+                                new File(fileLocation),
+                                HadoopUtils.getHadoopConfiguration(flinkConfig));
 
                 // Filter out AMRMToken before setting the tokens to the TaskManager container
                 // context.
@@ -460,7 +474,8 @@ public final class Utils {
                 log.error("Failed to add Hadoop's security tokens.", t);
             }
         } else {
-            log.info("Could not set security tokens because Hadoop's token file location is unknown.");
+            log.info(
+                    "Could not set security tokens because Hadoop's token file location is unknown.");
         }
 
         return ctx;
@@ -469,13 +484,13 @@ public final class Utils {
     /**
      * Generates the shell command to start a task manager.
      *
-     * @param flinkConfig     The Flink configuration.
-     * @param tmParams        Parameters for the task manager.
+     * @param flinkConfig The Flink configuration.
+     * @param tmParams Parameters for the task manager.
      * @param configDirectory The configuration directory for the config.yaml
-     * @param logDirectory    The log directory.
-     * @param hasLogback      Uses logback?
-     * @param hasLog4j        Uses log4j?
-     * @param mainClass       The main class to start with.
+     * @param logDirectory The log directory.
+     * @param hasLogback Uses logback?
+     * @param hasLog4j Uses log4j?
+     * @param mainClass The main class to start with.
      * @return A String containing the task manager startup command.
      */
     public static String getTaskManagerShellCommand(
@@ -492,14 +507,17 @@ public final class Utils {
         final Map<String, String> startCommandValues = new HashMap<>();
         startCommandValues.put("java", "$JAVA_HOME/bin/java");
 
-        final TaskExecutorProcessSpec taskExecutorProcessSpec = tmParams.getTaskExecutorProcessSpec();
-        startCommandValues.put("jvmmem", ProcessMemoryUtils.generateJvmParametersStr(taskExecutorProcessSpec));
+        final TaskExecutorProcessSpec taskExecutorProcessSpec =
+                tmParams.getTaskExecutorProcessSpec();
+        startCommandValues.put(
+                "jvmmem", ProcessMemoryUtils.generateJvmParametersStr(taskExecutorProcessSpec));
 
-        List<ConfigOption<String>> jvmOptions = Arrays.asList(
-                CoreOptions.FLINK_DEFAULT_JVM_OPTIONS,
-                CoreOptions.FLINK_JVM_OPTIONS,
-                CoreOptions.FLINK_DEFAULT_TM_JVM_OPTIONS,
-                CoreOptions.FLINK_TM_JVM_OPTIONS);
+        List<ConfigOption<String>> jvmOptions =
+                Arrays.asList(
+                        CoreOptions.FLINK_DEFAULT_JVM_OPTIONS,
+                        CoreOptions.FLINK_JVM_OPTIONS,
+                        CoreOptions.FLINK_DEFAULT_TM_JVM_OPTIONS,
+                        CoreOptions.FLINK_TM_JVM_OPTIONS);
         startCommandValues.put("jvmopts", generateJvmOptsString(flinkConfig, jvmOptions, hasKrb5));
 
         String logging = "";
@@ -510,18 +528,26 @@ public final class Utils {
             }
             if (hasLog4j) {
                 logging += " -Dlog4j.configuration=file:" + configDirectory + "/log4j.properties";
-                logging += " -Dlog4j.configurationFile=file:" + configDirectory + "/log4j.properties";
+                logging +=
+                        " -Dlog4j.configurationFile=file:" + configDirectory + "/log4j.properties";
             }
         }
 
         startCommandValues.put("logging", logging);
         startCommandValues.put("class", mainClass.getName());
         startCommandValues.put(
-                "redirects", "1> " + logDirectory + "/taskmanager.out " + "2> " + logDirectory + "/taskmanager.err");
+                "redirects",
+                "1> "
+                        + logDirectory
+                        + "/taskmanager.out "
+                        + "2> "
+                        + logDirectory
+                        + "/taskmanager.err");
 
-        String argsStr = TaskExecutorProcessUtils.generateDynamicConfigsStr(taskExecutorProcessSpec)
-                + " --configDir "
-                + configDirectory;
+        String argsStr =
+                TaskExecutorProcessUtils.generateDynamicConfigsStr(taskExecutorProcessSpec)
+                        + " --configDir "
+                        + configDirectory;
         if (!mainArgs.isEmpty()) {
             argsStr += " " + mainArgs;
         }
@@ -551,21 +577,24 @@ public final class Utils {
      *   <li><tt>redirects</tt> = output redirects
      * </ul>
      *
-     * @param template           a template start command with placeholders
+     * @param template a template start command with placeholders
      * @param startCommandValues a replacement map <tt>placeholder -&gt; value</tt>
      * @return the start command with placeholders filled in
      */
     public static String getStartCommand(String template, Map<String, String> startCommandValues) {
         for (Map.Entry<String, String> variable : startCommandValues.entrySet()) {
-            template = template.replace("%" + variable.getKey() + "%", variable.getValue())
-                    .replace("  ", " ")
-                    .trim();
+            template =
+                    template.replace("%" + variable.getKey() + "%", variable.getValue())
+                            .replace("  ", " ")
+                            .trim();
         }
         return template;
     }
 
     public static String generateJvmOptsString(
-            org.apache.flink.configuration.Configuration conf, List<ConfigOption<String>> jvmOptions, boolean hasKrb5) {
+            org.apache.flink.configuration.Configuration conf,
+            List<ConfigOption<String>> jvmOptions,
+            boolean hasKrb5) {
         StringBuilder javaOptsSb = new StringBuilder();
         for (ConfigOption<String> option : jvmOptions) {
             concatWithSpace(javaOptsSb, conf.get(option));
@@ -584,12 +613,13 @@ public final class Utils {
         return flinkPath.getFileSystem().isDistributedFS();
     }
 
-    private static List<YarnLocalResourceDescriptor> decodeYarnLocalResourceDescriptorListFromString(String resources)
-            throws Exception {
+    private static List<YarnLocalResourceDescriptor>
+            decodeYarnLocalResourceDescriptorListFromString(String resources) throws Exception {
         final List<YarnLocalResourceDescriptor> resourceDescriptors = new ArrayList<>();
         for (String shipResourceDescStr : resources.split(LOCAL_RESOURCE_DESCRIPTOR_SEPARATOR)) {
             if (!shipResourceDescStr.isEmpty()) {
-                resourceDescriptors.add(YarnLocalResourceDescriptor.fromString(shipResourceDescStr));
+                resourceDescriptors.add(
+                        YarnLocalResourceDescriptor.fromString(shipResourceDescStr));
             }
         }
         return resourceDescriptors;
@@ -605,35 +635,43 @@ public final class Utils {
             String propMem = yarnConfig.get(YARN_RM_INCREMENT_ALLOCATION_MB_KEY);
             String propVcore = yarnConfig.get(YARN_RM_INCREMENT_ALLOCATION_VCORES_KEY);
 
-            unitMemMB = propMem != null
-                    ? Integer.parseInt(propMem)
-                    : yarnConfig.getInt(
-                            YARN_RM_INCREMENT_ALLOCATION_MB_LEGACY_KEY, DEFAULT_YARN_RM_INCREMENT_ALLOCATION_MB);
-            unitVcore = propVcore != null
-                    ? Integer.parseInt(propVcore)
-                    : yarnConfig.getInt(
-                            YARN_RM_INCREMENT_ALLOCATION_VCORES_LEGACY_KEY,
-                            DEFAULT_YARN_RM_INCREMENT_ALLOCATION_VCORES);
+            unitMemMB =
+                    propMem != null
+                            ? Integer.parseInt(propMem)
+                            : yarnConfig.getInt(
+                                    YARN_RM_INCREMENT_ALLOCATION_MB_LEGACY_KEY,
+                                    DEFAULT_YARN_RM_INCREMENT_ALLOCATION_MB);
+            unitVcore =
+                    propVcore != null
+                            ? Integer.parseInt(propVcore)
+                            : yarnConfig.getInt(
+                                    YARN_RM_INCREMENT_ALLOCATION_VCORES_LEGACY_KEY,
+                                    DEFAULT_YARN_RM_INCREMENT_ALLOCATION_VCORES);
         } else {
-            unitMemMB = yarnConfig.getInt(
-                    YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
-                    YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
-            unitVcore = yarnConfig.getInt(
-                    YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
-                    YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
+            unitMemMB =
+                    yarnConfig.getInt(
+                            YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
+                            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
+            unitVcore =
+                    yarnConfig.getInt(
+                            YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
+                            YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
         }
 
         return Resource.newInstance(unitMemMB, unitVcore);
     }
 
     public static List<Path> getQualifiedRemoteProvidedLibDirs(
-            org.apache.flink.configuration.Configuration configuration, YarnConfiguration yarnConfiguration)
+            org.apache.flink.configuration.Configuration configuration,
+            YarnConfiguration yarnConfiguration)
             throws IOException {
 
-        return getRemoteSharedLibPaths(configuration, pathStr -> {
-            final Path path = new Path(pathStr);
-            return path.getFileSystem(yarnConfiguration).makeQualified(path);
-        });
+        return getRemoteSharedLibPaths(
+                configuration,
+                pathStr -> {
+                    final Path path = new Path(pathStr);
+                    return path.getFileSystem(yarnConfiguration).makeQualified(path);
+                });
     }
 
     private static List<Path> getRemoteSharedLibPaths(
@@ -642,40 +680,45 @@ public final class Utils {
             throws IOException {
 
         final List<Path> providedLibDirs =
-                ConfigUtils.decodeListFromConfig(configuration, YarnConfigOptions.PROVIDED_LIB_DIRS, strToPathMapper);
+                ConfigUtils.decodeListFromConfig(
+                        configuration, YarnConfigOptions.PROVIDED_LIB_DIRS, strToPathMapper);
 
         for (Path path : providedLibDirs) {
             if (!Utils.isRemotePath(path.toString())) {
-                throw new IllegalArgumentException("The \""
-                        + YarnConfigOptions.PROVIDED_LIB_DIRS.key()
-                        + "\" should only contain"
-                        + " dirs accessible from all worker nodes, while the \""
-                        + path
-                        + "\" is local.");
+                throw new IllegalArgumentException(
+                        "The \""
+                                + YarnConfigOptions.PROVIDED_LIB_DIRS.key()
+                                + "\" should only contain"
+                                + " dirs accessible from all worker nodes, while the \""
+                                + path
+                                + "\" is local.");
             }
         }
         return providedLibDirs;
     }
 
-    public static boolean isUsrLibDirectory(final FileSystem fileSystem, final Path path) throws IOException {
+    public static boolean isUsrLibDirectory(final FileSystem fileSystem, final Path path)
+            throws IOException {
         final FileStatus fileStatus = fileSystem.getFileStatus(path);
         // Use the Path obj from fileStatus to get rid of trailing slash
         return fileStatus.isDirectory()
-                && ConfigConstants.DEFAULT_FLINK_USR_LIB_DIR.equals(
-                        fileStatus.getPath().getName());
+                && ConfigConstants.DEFAULT_FLINK_USR_LIB_DIR.equals(fileStatus.getPath().getName());
     }
 
     public static Optional<Path> getQualifiedRemoteProvidedUsrLib(
-            org.apache.flink.configuration.Configuration configuration, YarnConfiguration yarnConfiguration)
+            org.apache.flink.configuration.Configuration configuration,
+            YarnConfiguration yarnConfiguration)
             throws IOException, IllegalArgumentException {
         String usrlib = configuration.get(YarnConfigOptions.PROVIDED_USRLIB_DIR);
         if (usrlib == null) {
             return Optional.empty();
         }
-        final Path qualifiedUsrLibPath = FileSystem.get(yarnConfiguration).makeQualified(new Path(usrlib));
+        final Path qualifiedUsrLibPath =
+                FileSystem.get(yarnConfiguration).makeQualified(new Path(usrlib));
         checkArgument(
                 isRemotePath(qualifiedUsrLibPath.toString()),
-                "The \"%s\" must point to a remote dir " + "which is accessible from all worker nodes.",
+                "The \"%s\" must point to a remote dir "
+                        + "which is accessible from all worker nodes.",
                 YarnConfigOptions.PROVIDED_USRLIB_DIR.key());
         checkArgument(
                 isUsrLibDirectory(FileSystem.get(yarnConfiguration), qualifiedUsrLibPath),
@@ -699,7 +742,8 @@ public final class Utils {
      * @param flinkConfig The Flink configuration object.
      * @return The yarn configuration.
      */
-    public static YarnConfiguration getYarnConfiguration(org.apache.flink.configuration.Configuration flinkConfig) {
+    public static YarnConfiguration getYarnConfiguration(
+            org.apache.flink.configuration.Configuration flinkConfig) {
         final YarnConfiguration yarnConfig = new YarnConfiguration();
 
         for (String key : flinkConfig.keySet()) {
@@ -708,7 +752,11 @@ public final class Utils {
                     String newKey = key.substring("flink.".length());
                     String value = flinkConfig.getString(key, null);
                     yarnConfig.set(newKey, value);
-                    LOG.debug("Adding Flink config entry for {} as {}={} to Yarn config", key, newKey, value);
+                    LOG.debug(
+                            "Adding Flink config entry for {} as {}={} to Yarn config",
+                            key,
+                            newKey,
+                            value);
                 }
             }
         }
@@ -728,7 +776,8 @@ public final class Utils {
      * @param flinkConfig the Flink configuration to read the ACL values from.
      */
     public static void setAclsFor(
-            ContainerLaunchContext amContainer, org.apache.flink.configuration.Configuration flinkConfig) {
+            ContainerLaunchContext amContainer,
+            org.apache.flink.configuration.Configuration flinkConfig) {
         Map<ApplicationAccessType, String> acls = new HashMap<>();
         final String viewAcls = flinkConfig.get(YarnConfigOptions.APPLICATION_VIEW_ACLS);
         final String modifyAcls = flinkConfig.get(YarnConfigOptions.APPLICATION_MODIFY_ACLS);
@@ -749,9 +798,10 @@ public final class Utils {
     /* Validates the ACL string to ensure that it is either null or the wildcard ACL. */
     private static void validateAclString(String acl) {
         if (acl != null && acl.contains("*") && !acl.equals("*")) {
-            throw new IllegalArgumentException(String.format(
-                    "Invalid wildcard ACL %s. The ACL wildcard does not support regex. The only valid wildcard ACL is '*'.",
-                    acl));
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Invalid wildcard ACL %s. The ACL wildcard does not support regex. The only valid wildcard ACL is '*'.",
+                            acl));
         }
     }
 
