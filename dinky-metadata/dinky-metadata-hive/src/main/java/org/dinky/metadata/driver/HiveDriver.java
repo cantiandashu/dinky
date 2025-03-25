@@ -295,7 +295,7 @@ public class HiveDriver extends AbstractJdbcDriver implements Driver {
 
     @Override
     String getDriverClass() {
-        return "org.apache.hive.jdbc.HiveDriver";
+        return "io.transwarp.jdbc.QuarkDriver";
     }
 
     @Override
