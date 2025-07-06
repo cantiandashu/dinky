@@ -33,6 +33,7 @@ import org.dinky.data.enums.GatewayType;
 import org.dinky.data.enums.JobStatus;
 import org.dinky.data.flink.backpressure.FlinkJobNodeBackPressure;
 import org.dinky.data.flink.checkpoint.CheckPointOverView;
+import org.dinky.data.flink.checkpoint.CheckpointStatistics;
 import org.dinky.data.flink.config.CheckpointConfigInfo;
 import org.dinky.data.flink.config.FlinkJobConfigInfo;
 import org.dinky.data.flink.exceptions.FlinkJobExceptionsDetail;
@@ -57,9 +58,7 @@ import org.dinky.utils.TimeUtil;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
@@ -188,9 +187,9 @@ public class JobRefreshHandler {
 
         boolean isDone = (JobStatus.isDone(jobInstance.getStatus()))
                 || (TimeUtil.localDateTimeToLong(jobInstance.getFinishTime()) > 0
-                        && Duration.between(jobInstance.getFinishTime(), LocalDateTime.now())
-                                        .toMinutes()
-                                >= 1);
+                && Duration.between(jobInstance.getFinishTime(), LocalDateTime.now())
+                .toMinutes()
+                >= 1);
 
         isDone = !isTransition && isDone;
 
@@ -217,6 +216,7 @@ public class JobRefreshHandler {
         if (isDone) {
             try {
                 log.debug("Job is done: {}->{}", jobInstance.getId(), jobInstance.getName());
+                jobHistoryService.updateById(jobInfoDetail.getJobDataDto().toJobHistory());
                 handleJobDone(jobInfoDetail);
             } catch (Exception e) {
                 log.error("failed handel job done：", e);
@@ -239,8 +239,8 @@ public class JobRefreshHandler {
                 && SystemConfiguration.getInstances().getUseFlinkHistoryServer().getValue()) {
             jobManagerHost = "127.0.0.1:"
                     + SystemConfiguration.getInstances()
-                            .getFlinkHistoryServerPort()
-                            .getValue();
+                    .getFlinkHistoryServerPort()
+                    .getValue();
         }
         JobDataDto.JobDataDtoBuilder builder = JobDataDto.builder();
         FlinkAPI api = FlinkAPI.build(jobManagerHost);
@@ -306,7 +306,7 @@ public class JobRefreshHandler {
         ClusterInstance clusterInstance = jobInfoDetail.getClusterInstance();
         if (!Asserts.isNull(clusterCfg)
                 && (GatewayType.YARN_PER_JOB.getLongValue().equals(clusterInstance.getType())
-                        || GatewayType.YARN_APPLICATION.getLongValue().equals(clusterInstance.getType()))) {
+                || GatewayType.YARN_APPLICATION.getLongValue().equals(clusterInstance.getType()))) {
             try {
                 String appId = jobInfoDetail.getClusterInstance().getName();
 
@@ -376,7 +376,10 @@ public class JobRefreshHandler {
 
                 Gateway gateway = Gateway.build(gatewayConfig);
                 String latestJobManageHost = gateway.getLatestJobManageHost(appId, clusterInstance.getJobManagerHost());
-
+                ArrayList<String> latestCheckpoints = gateway.getCheckpoints(appId, jobInfoDetail.getInstance().getJid());
+                if (Asserts.isNotNull(latestCheckpoints)) {
+                    updateCheckpointHistory(jobInfoDetail, latestCheckpoints);
+                }
                 if (Asserts.isNotNull(latestJobManageHost)) {
                     clusterInstance.setHosts(latestJobManageHost);
                     clusterInstance.setJobManagerHost(latestJobManageHost);
@@ -388,5 +391,36 @@ public class JobRefreshHandler {
                 }
             }
         }
+    }
+
+    private static void updateCheckpointHistory(JobInfoDetail jobInfoDetail, ArrayList<String> LatestCheckpoints) {
+        List<CheckpointStatistics> CheckpointHistory = jobInfoDetail.getJobDataDto().getCheckpoints().getHistory();
+        int CheckpointHistorySize = CheckpointHistory.size();
+        int LatestCheckpointsSize = LatestCheckpoints.size();
+        for (int i = 0; i < CheckpointHistorySize && i < LatestCheckpointsSize; i++) {
+            CheckpointHistory.get(i).setExternalPath(replaceCheckpointNumber(CheckpointHistory.get(i).getExternalPath(), LatestCheckpoints.get(i)));
+        }
+    }
+
+    private static String replaceCheckpointNumber(String originalStr, String newNumberStr) {
+        // 1. 从原始字符串中找到"chk-"的位置
+        int chkIndex = originalStr.lastIndexOf("chk-");
+        if (chkIndex == -1) {
+            throw new IllegalArgumentException("原始字符串中不包含'chk-'");
+        }
+
+        // 2. 获取"chk-"后面的数字部分
+        String prefix = originalStr.substring(0, chkIndex + 4); // +4 包含"chk-"
+        String oldNumberStr = originalStr.substring(chkIndex + 4);
+
+        // 3. 处理新数字字符串，去掉前导零
+        String trimmedNewNumber = newNumberStr.replaceFirst("^0+", "");
+        if (trimmedNewNumber.isEmpty()) {
+            trimmedNewNumber = "0"; // 如果全是0，保留一个0
+        }
+
+        // 4. 组合新字符串
+        return prefix + trimmedNewNumber;
+
     }
 }

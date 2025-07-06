@@ -253,4 +253,9 @@ public abstract class AbstractGateway implements Gateway {
     public String getLatestJobManageHost(String appId, String oldJobManagerHost) {
         throw new NotSupportGetStatusException("Does not support obtaining the latest JobManager host address");
     }
+   @Override
+   public ArrayList<String> getCheckpoints(String appId,String jobid){
+        throw new NotSupportGetStatusException("Does not support obtaining Checkpoints");};
+
+
 }

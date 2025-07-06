@@ -551,6 +551,51 @@ public abstract class YarnGateway extends AbstractGateway {
         }
         return null;
     }
+    
+    @Override
+    public ArrayList<String> getCheckpoints(String appId,String jobid) {
+        HighAvailabilityMode highAvailabilityMode = HighAvailabilityMode.fromConfig(configuration);
+
+        if (HighAvailabilityMode.ZOOKEEPER == highAvailabilityMode) {
+            configuration.set(HighAvailabilityOptions.HA_CLUSTER_ID, appId);
+            String zkQuorum = configuration.getValue(HighAvailabilityOptions.HA_ZOOKEEPER_QUORUM);
+
+            if (zkQuorum == null || StringUtils.isBlank(zkQuorum)) {
+                throw new RuntimeException("No valid ZooKeeper quorum has been specified. "
+                        + "You can specify the quorum via the configuration key '"
+                        + HighAvailabilityOptions.HA_ZOOKEEPER_QUORUM.key()
+                        + "'.");
+            }
+            int sessionTimeout = Convert.toInt(configuration.get(HighAvailabilityOptions.ZOOKEEPER_SESSION_TIMEOUT).getSeconds()*1000);
+            String root = configuration.getValue(HighAvailabilityOptions.HA_ZOOKEEPER_ROOT);
+            String namespace = configuration.getValue(HighAvailabilityOptions.HA_CLUSTER_ID);
+
+            ZooKeeper zooKeeper = null;
+            ArrayList<String> LatestCheckpoints=null;
+            try {
+                zooKeeper = new ZooKeeper(zkQuorum, sessionTimeout, watchedEvent -> {});
+                String path = generateZookeeperPath(root, namespace, "jobs", jobid, "checkpoints");
+                LatestCheckpoints = (ArrayList<String>) zooKeeper.getChildren(path, null);
+                if (LatestCheckpoints != null && LatestCheckpoints.size() > 0) {
+                    Collections.sort(LatestCheckpoints,Collections.reverseOrder());
+                    return LatestCheckpoints;
+                }
+            } catch (Exception e) {
+                logger.error("", e);
+            } finally {
+                if (Asserts.isNotNull(zooKeeper)) {
+                    try {
+                        zooKeeper.close();
+                    } catch (InterruptedException e) {
+                        logger.error("", e);
+                    }
+                }
+            }
+        } else {
+            logger.info("High availability non-ZooKeeper mode, current mode is：{}", highAvailabilityMode);
+        }
+        return null;
+    }
 
     /**
      * Creates a ZooKeeper path of the form "/a/b/.../z".

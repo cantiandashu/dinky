@@ -19,6 +19,7 @@
 
 package org.dinky.gateway;
 
+import org.apache.avro.generic.GenericData;
 import org.dinky.assertion.Asserts;
 import org.dinky.context.FlinkUdfPathContextHolder;
 import org.dinky.data.enums.GatewayType;
@@ -31,6 +32,7 @@ import org.dinky.gateway.result.TestResult;
 
 import org.apache.flink.runtime.jobgraph.JobGraph;
 
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.ServiceLoader;
 
@@ -92,4 +94,7 @@ public interface Gateway {
     GatewayResult deployCluster(FlinkUdfPathContextHolder udfPathContextHolder);
 
     String getLatestJobManageHost(String appId, String oldJobManagerHost);
+
+    ArrayList<String> getCheckpoints(String appId,String jobid);
+
 }
