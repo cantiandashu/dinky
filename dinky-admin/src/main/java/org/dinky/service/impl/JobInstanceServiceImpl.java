@@ -53,6 +53,7 @@ import org.dinky.service.HistoryService;
 import org.dinky.service.JobHistoryService;
 import org.dinky.service.JobInstanceService;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -146,6 +147,11 @@ public class JobInstanceServiceImpl extends SuperServiceImpl<JobInstanceMapper, 
     @Override
     public List<JobInstance> listJobInstanceActive() {
         return baseMapper.listJobInstanceActive();
+    }
+
+    @Override
+    public List<JobInstance> listAllJobInstance() {
+        return baseMapper.listAllJobInstance();
     }
 
     @Override

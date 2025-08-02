@@ -160,8 +160,8 @@ public class SystemInit implements ApplicationRunner {
         DaemonTask clearJobHistoryTask = DaemonTask.build(new DaemonTaskConfig(ClearJobHistoryTask.TYPE));
         schedule.addSchedule(clearJobHistoryTask, new PeriodicTrigger(1, TimeUnit.HOURS));
 
-        // Add flink running job task to flink job thread pool
-        List<JobInstance> jobInstances = jobInstanceService.listJobInstanceActive();
+        // Add ALL flink  job task to flink job thread pool
+        List<JobInstance> jobInstances = jobInstanceService.listAllJobInstance();
         FlinkJobThreadPool flinkJobThreadPool = FlinkJobThreadPool.getInstance();
         for (JobInstance jobInstance : jobInstances) {
             DaemonTaskConfig config =

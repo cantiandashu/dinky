@@ -91,6 +91,13 @@
         order by id desc
     </select>
 
+    <select id="listAllJobInstance" resultType="org.dinky.data.model.job.JobInstance">
+        select *
+        from (select *, row_number() over(partition by tenant_id,task_id order by history_id desc ) as num
+              from dinky_job_instance) t
+        where t.num = 1;
+    </select>
+
     <select id="getJobInstanceByTaskId" resultType="org.dinky.data.model.job.JobInstance">
         select *
         from dinky_job_instance

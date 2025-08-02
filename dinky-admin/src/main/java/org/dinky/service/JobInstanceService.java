@@ -62,6 +62,12 @@ public interface JobInstanceService extends ISuperService<JobInstance> {
     List<JobInstance> listJobInstanceActive();
 
     /**
+     * Get a list of active job instances.
+     *
+     * @return A list of {@link JobInstance} objects representing the ALL job instances.
+     */
+    List<JobInstance> listAllJobInstance();
+    /**
      * Get the job information detail for the given ID.
      *
      * @param id The ID of the job information detail to get.
